@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* ─── 花园酒店主题色（T004）─── */
+@theme inline {
+  --color-gold:      #c9973a;
+  --color-gold-lt:   #f5e8cc;
+  --color-navy:      #1a2744;
+  --color-navy-lt:   #2d3f6b;
+  --color-bg:        #f7f5f0;
+  --color-card:      #ffffff;
+  --color-muted:     #6b7280;
+  --color-border:    #e5e0d8;
+}
+
+:root {
+  --background: #f7f5f0;
+  --foreground: #2c2c2c;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* T038: 移动端响应式 */
+@media (max-width: 959px) {
+  .sidebar-collapse {
+    display: none;
+  }
+  .sidebar-collapse.open {
+    display: block;
+  }
+}
+
+@media (max-width: 559px) {
+  .review-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
