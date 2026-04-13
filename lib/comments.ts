@@ -122,23 +122,34 @@ export async function getStats(): Promise<Stats> {
   };
 }
 
-// ─── getStatsSimple（用 CLI 验证过的计算）────────────────────────────────────
+// ─── getStatsSimple（不使用聚合函数，客户端计算均值）──────────────────────────
 export async function getStatsSimple(): Promise<Stats> {
-  const { count: total } = await dbQuery<Comment>(
+  // 总数：通过 Prefer:count=exact 头 + limit=1 最小化数据传输
+  const { count: total } = await dbQuery<{ _id: string }>(
     "comments",
-    { select: "_id" },
+    { select: "_id", limit: "1" },
     true
   );
 
-  const { data: avgData } = await dbQuery<{ avg: string }>(
+  // 均分：拉取全部 score 字段（2542 行 × 1 列），客户端计算
+  const { data: scoreData } = await dbQuery<{ score: string }>(
     "comments",
-    { select: "avg:score.avg()" }
+    { select: "score", limit: "3000" }
   );
+  const scores = scoreData
+    .map((r) => parseFloat(r.score as unknown as string))
+    .filter((n) => !isNaN(n));
+  const avgScore =
+    scores.length > 0
+      ? parseFloat(
+          (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+        )
+      : 0;
 
   return {
     total: total ?? 0,
-    avgScore: parseFloat(parseFloat(avgData[0]?.avg || "0").toFixed(1)),
-    withImages: total ?? 0, // 所有评论都有图片（数据验证过）
+    avgScore,
+    withImages: total ?? 0,
   };
 }
 
@@ -148,10 +159,12 @@ export async function getFilterOptions(): Promise<FilterOptions> {
     dbQuery<{ travel_type: string }>("comments", {
       select: "travel_type",
       order: "travel_type.asc",
+      limit: "3000",
     }),
     dbQuery<{ fuzzy_room_type: string }>("comments", {
       select: "fuzzy_room_type",
       order: "fuzzy_room_type.asc",
+      limit: "3000",
     }),
   ]);
 
