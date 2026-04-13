@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>花园酒店 · 住客评论</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    /* ─── 全局 ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --gold:    #c9973a;
+      --gold-lt: #f5e8cc;
+      --navy:    #1a2744;
+      --navy-lt: #2d3f6b;
+      --bg:      #f7f5f0;
+      --card:    #ffffff;
+      --text:    #2c2c2c;
+      --muted:   #6b7280;
+      --border:  #e5e0d8;
+      --radius:  12px;
+      --shadow:  0 2px 12px rgba(26,39,68,.08);
+      --shadow-h:0 6px 24px rgba(26,39,68,.14);
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ─── 顶部栏 ─── */
+    header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-lt) 100%);
+      color: #fff;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 20px rgba(0,0,0,.25);
+    }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      height: 64px;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: var(--gold);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+    .logo-sub  { font-size: 12px; color: rgba(255,255,255,.6); }
+
+    /* 搜索框 */
+    .search-wrap {
+      flex: 1;
+      max-width: 480px;
+      position: relative;
+    }
+    .search-wrap input {
+      width: 100%;
+      height: 38px;
+      border: none;
+      border-radius: 20px;
+      padding: 0 16px 0 40px;
+      font-size: 14px;
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      outline: none;
+      transition: background .2s;
+    }
+    .search-wrap input::placeholder { color: rgba(255,255,255,.5); }
+    .search-wrap input:focus { background: rgba(255,255,255,.22); }
+    .search-icon {
+      position: absolute;
+      left: 14px; top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255,255,255,.5);
+      font-size: 15px;
+      pointer-events: none;
+    }
+
+    /* 统计胶囊 */
+    .stats-pills {
+      display: flex; gap: 16px; margin-left: auto; flex-shrink: 0;
+    }
+    .stat-pill {
+      text-align: center;
+      padding: 4px 16px;
+      background: rgba(255,255,255,.1);
+      border-radius: 20px;
+    }
+    .stat-pill .val { font-size: 18px; font-weight: 700; color: var(--gold); }
+    .stat-pill .lbl { font-size: 11px; color: rgba(255,255,255,.6); }
+
+    /* ─── 主体布局 ─── */
+    .page-body {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 24px 48px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* ─── 筛选侧边栏 ─── */
+    .sidebar {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      position: sticky;
+      top: 80px;
+    }
+    .sidebar-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-section { margin-bottom: 20px; }
+    .filter-label {
+      font-size: 13px; font-weight: 600;
+      color: var(--navy); margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .filter-label .dot {
+      width: 6px; height: 6px;
+      background: var(--gold); border-radius: 50%;
+    }
+
+    /* 星级 */
+    .star-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+    .star-btn {
+      padding: 5px 10px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s;
+      color: var(--text);
+    }
+    .star-btn:hover  { border-color: var(--gold); color: var(--gold); }
+    .star-btn.active { background: var(--gold); border-color: var(--gold); color: #fff; font-weight: 600; }
+
+    /* 多选标签 */
+    .tag-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag-btn {
+      padding: 5px 10px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all .15s;
+      color: var(--muted);
+    }
+    .tag-btn:hover  { border-color: var(--navy-lt); color: var(--navy); }
+    .tag-btn.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+    /* 清除按钮 */
+    .clear-btn {
+      width: 100%;
+      padding: 9px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      margin-top: 4px;
+    }
+    .clear-btn:hover { border-color: #e57373; color: #e57373; }
+
+    /* ─── 右侧内容区 ─── */
+    .content-area {}
+
+    /* 工具栏 */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .result-count { font-size: 14px; color: var(--muted); }
+    .result-count strong { color: var(--text); font-size: 16px; }
+    .sort-select {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+    }
+    .sort-select:focus { border-color: var(--gold); }
+
+    /* ─── 评论卡片网格 ─── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 18px;
+    }
+
+    .review-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: box-shadow .2s, transform .2s;
+      cursor: default;
+    }
+    .review-card:hover {
+      box-shadow: var(--shadow-h);
+      transform: translateY(-2px);
+    }
+
+    /* 卡片顶部 */
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; }
+    .card-meta { display: flex; flex-direction: column; gap: 3px; }
+    .card-date { font-size: 12px; color: var(--muted); }
+    .card-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .badge-travel { background: #e8f4fd; color: #1976d2; }
+    .badge-room   { background: #f3e5f5; color: #7b1fa2; }
+
+    /* 评分 */
+    .score-wrap {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    }
+    .score-badge {
+      width: 48px; height: 48px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .score-stars { font-size: 12px; color: var(--gold); letter-spacing: 1px; }
+
+    /* 评论文本 */
+    .card-comment {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #333;
+    }
+    .card-comment.collapsed {
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .expand-btn {
+      font-size: 12px;
+      color: var(--gold);
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      font-family: inherit;
+    }
+    .expand-btn:hover { text-decoration: underline; }
+
+    /* 分类标签 */
+    .card-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cat-tag {
+      padding: 3px 9px;
+      background: var(--gold-lt);
+      color: #8b6012;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    /* 图片区 */
+    .card-images {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .thumb {
+      width: 68px; height: 68px;
+      border-radius: 8px;
+      object-fit: cover;
+      cursor: pointer;
+      transition: opacity .15s, transform .15s;
+      border: 2px solid transparent;
+    }
+    .thumb:hover { opacity: .9; transform: scale(1.04); border-color: var(--gold); }
+    .more-imgs {
+      width: 68px; height: 68px;
+      border-radius: 8px;
+      background: var(--navy);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .more-imgs:hover { background: var(--navy-lt); }
+
+    /* 卡片底部 */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .useful-tag { display: flex; align-items: center; gap: 4px; }
+
+    /* ─── 分页 ─── */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 32px;
+    }
+    .page-btn {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s;
+      color: var(--text);
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+    .page-btn.active { background: var(--gold); border-color: var(--gold); color: #fff; font-weight: 600; }
+    .page-btn:disabled { opacity: .4; cursor: default; }
+    .page-info { font-size: 13px; color: var(--muted); }
+
+    /* ─── 空状态 ─── */
+    .empty-state {
+      text-align: center;
+      padding: 64px 32px;
+      color: var(--muted);
+      grid-column: 1 / -1;
+    }
+    .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state p { font-size: 15px; }
+
+    /* ─── 灯箱 ─── */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.88);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: min(90vw, 900px);
+      max-height: 80vh;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+    .lightbox-controls {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-top: 16px;
+    }
+    .lb-btn {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.3);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .lb-btn:hover { background: rgba(255,255,255,.25); }
+    .lb-btn:disabled { opacity: .3; cursor: default; }
+    .lb-counter { color: rgba(255,255,255,.7); font-size: 14px; }
+    .lb-close {
+      position: absolute;
+      top: 20px; right: 24px;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.4);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lb-close:hover { background: rgba(255,255,255,.2); }
+
+    /* ─── 加载状态 ─── */
+    .loading {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 64px;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── 评分色 ─── */
+    .score-5   { background: #2e7d32; }
+    .score-4   { background: #558b2f; }
+    .score-3   { background: #f57f17; }
+    .score-2   { background: #e65100; }
+    .score-1   { background: #b71c1c; }
+
+    /* ─── 高亮 ─── */
+    mark {
+      background: #fff176;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
+    /* ─── 响应式 ─── */
+    @media (max-width: 960px) {
+      .page-body { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .stats-pills { display: none; }
+    }
+    @media (max-width: 560px) {
+      .header-inner { height: 56px; }
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── 顶部栏 ─── -->
+<header>
+  <div class="header-inner">
+    <div class="logo-wrap">
+      <div class="logo-icon">🏨</div>
+      <div>
+        <div class="logo-text">花园酒店</div>
+        <div class="logo-sub">住客评论中心</div>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="搜索评论关键词…" autocomplete="off" />
+    </div>
+
+    <div class="stats-pills" id="statsPills"></div>
+  </div>
+</header>
+
+<!-- ─── 主体 ─── -->
+<div class="page-body">
+
+  <!-- 筛选侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-title">🎛 筛选条件</div>
+
+    <!-- 评分 -->
+    <div class="filter-section">
+      <div class="filter-label"><span class="dot"></span>综合评分</div>
+      <div class="star-filter" id="scoreFilter">
+        <button class="star-btn active" data-score="all">全部</button>
+        <button class="star-btn" data-score="5">⭐ 5分</button>
+        <button class="star-btn" data-score="4">4分</button>
+        <button class="star-btn" data-score="3">3分</button>
+        <button class="star-btn" data-score="2">2分以下</button>
+      </div>
+    </div>
+
+    <!-- 出行类型 -->
+    <div class="filter-section">
+      <div class="filter-label"><span class="dot"></span>出行类型</div>
+      <div class="tag-filter" id="travelFilter"></div>
+    </div>
+
+    <!-- 房型 -->
+    <div class="filter-section">
+      <div class="filter-label"><span class="dot"></span>房间类型</div>
+      <div class="tag-filter" id="roomFilter"></div>
+    </div>
+
+    <!-- 评论分类 -->
+    <div class="filter-section">
+      <div class="filter-label"><span class="dot"></span>评论涉及</div>
+      <div class="tag-filter" id="catFilter"></div>
+    </div>
+
+    <button class="clear-btn" id="clearBtn">✕ 清除所有筛选</button>
+  </aside>
+
+  <!-- 评论内容区 -->
+  <main class="content-area">
+    <div class="toolbar">
+      <div class="result-count" id="resultCount"></div>
+      <select class="sort-select" id="sortSelect">
+        <option value="date_desc">最新发布</option>
+        <option value="date_asc">最早发布</option>
+        <option value="score_desc">评分最高</option>
+        <option value="score_asc">评分最低</option>
+        <option value="quality_desc">质量分最高</option>
+        <option value="useful_desc">最多人觉得有用</option>
+      </select>
+    </div>
+
+    <div class="cards-grid" id="cardsGrid">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>正在加载评论数据…</p>
+      </div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </main>
+</div>
+
+<!-- ─── 灯箱 ─── -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose">✕</button>
+  <img id="lbImg" src="" alt="评论图片" />
+  <div class="lightbox-controls">
+    <button class="lb-btn" id="lbPrev">‹</button>
+    <span class="lb-counter" id="lbCounter"></span>
+    <button class="lb-btn" id="lbNext">›</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  数据加载与解析
+// ═══════════════════════════════════════════════
+let allData = [];
+let filtered = [];
+let currentPage = 1;
+const PAGE_SIZE = 12;
+
+// 筛选状态
+const filterState = {
+  search: '',
+  score: 'all',
+  travel: new Set(),
+  room: new Set(),
+  cats: new Set(),
+  sort: 'date_desc'
+};
+
+async function loadData() {
+  const res = await fetch('./enriched_comments.csv');
+  const text = await res.text();
+
+  const parsed = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: h => h.trim()
+  });
+
+  allData = parsed.data.map(row => {
+    // 解析 images
+    let images = [];
+    if (row.images && row.images.trim() !== '[]') {
+      try { images = JSON.parse(row.images); } catch (e) {}
+    }
+    // 解析 categories（Python list 格式）
+    let cats = [];
+    if (row.categories && row.categories.trim() !== '[]') {
+      try {
+        cats = JSON.parse(row.categories.replace(/'/g, '"'));
+      } catch (e) {}
+    }
+    return {
+      id:           row._id,
+      comment:      (row.comment || '').trim(),
+      images,
+      score:        parseFloat(row.score) || 0,
+      date:         row.publish_date || '',
+      room_type:    row.room_type || '',
+      fuzzy_room:   row.fuzzy_room_type || '',
+      travel:       row.travel_type || '',
+      useful:       parseInt(row.useful_count) || 0,
+      quality:      parseFloat(row.quality_score) || 0,
+      cats
+    };
+  });
+
+  buildFilters();
+  renderStats();
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════
+//  统计与筛选选项构建
+// ═══════════════════════════════════════════════
+function renderStats() {
+  const avg = (allData.reduce((s, r) => s + r.score, 0) / allData.length).toFixed(1);
+  const withImg = allData.filter(r => r.images.length > 0).length;
+  document.getElementById('statsPills').innerHTML = `
+    <div class="stat-pill"><div class="val">${allData.length}</div><div class="lbl">条评论</div></div>
+    <div class="stat-pill"><div class="val">${avg}</div><div class="lbl">平均评分</div></div>
+    <div class="stat-pill"><div class="val">${withImg}</div><div class="lbl">含图评论</div></div>
+  `;
+}
+
+function buildFilters() {
+  // 出行类型
+  const travels = [...new Set(allData.map(r => r.travel).filter(Boolean))].sort();
+  const travelEl = document.getElementById('travelFilter');
+  travelEl.innerHTML = travels.map(t =>
+    `<button class="tag-btn" data-type="travel" data-val="${t}">${t}</button>`
+  ).join('');
+
+  // 房型
+  const rooms = [...new Set(allData.map(r => r.fuzzy_room).filter(Boolean))].sort();
+  const roomEl = document.getElementById('roomFilter');
+  roomEl.innerHTML = rooms.map(r =>
+    `<button class="tag-btn" data-type="room" data-val="${r}">${r}</button>`
+  ).join('');
+
+  // 分类
+  const catCount = {};
+  allData.forEach(r => r.cats.forEach(c => { catCount[c] = (catCount[c] || 0) + 1; }));
+  const cats = Object.entries(catCount).sort((a, b) => b[1] - a[1]).map(([c]) => c);
+  const catEl = document.getElementById('catFilter');
+  catEl.innerHTML = cats.map(c =>
+    `<button class="tag-btn" data-type="cat" data-val="${c}">${c}</button>`
+  ).join('');
+
+  // 绑定事件
+  document.querySelectorAll('.tag-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type, val = btn.dataset.val;
+      const set = type === 'travel' ? filterState.travel
+                : type === 'room'   ? filterState.room
+                                    : filterState.cats;
+      if (set.has(val)) { set.delete(val); btn.classList.remove('active'); }
+      else              { set.add(val);    btn.classList.add('active'); }
+      currentPage = 1;
+      applyFilters();
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  评分筛选
+// ═══════════════════════════════════════════════
+document.getElementById('scoreFilter').addEventListener('click', e => {
+  const btn = e.target.closest('.star-btn');
+  if (!btn) return;
+  document.querySelectorAll('.star-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterState.score = btn.dataset.score;
+  currentPage = 1;
+  applyFilters();
+});
+
+// 搜索
+let searchTimer;
+document.getElementById('searchInput').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    filterState.search = e.target.value.trim();
+    currentPage = 1;
+    applyFilters();
+  }, 250);
+});
+
+// 排序
+document.getElementById('sortSelect').addEventListener('change', e => {
+  filterState.sort = e.target.value;
+  currentPage = 1;
+  applyFilters();
+});
+
+// 清除
+document.getElementById('clearBtn').addEventListener('click', () => {
+  filterState.search = '';
+  filterState.score = 'all';
+  filterState.travel.clear();
+  filterState.room.clear();
+  filterState.cats.clear();
+  filterState.sort = 'date_desc';
+  document.getElementById('searchInput').value = '';
+  document.getElementById('sortSelect').value = 'date_desc';
+  document.querySelectorAll('.star-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.star-btn[data-score="all"]').classList.add('active');
+  document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+  currentPage = 1;
+  applyFilters();
+});
+
+// ═══════════════════════════════════════════════
+//  筛选 & 排序
+// ═══════════════════════════════════════════════
+function applyFilters() {
+  const kw = filterState.search.toLowerCase();
+
+  filtered = allData.filter(r => {
+    // 关键词
+    if (kw && !r.comment.toLowerCase().includes(kw)) return false;
+
+    // 评分
+    if (filterState.score !== 'all') {
+      const s = parseFloat(filterState.score);
+      if (s === 2) { if (r.score > 2) return false; }
+      else         { if (Math.floor(r.score) !== s && r.score !== s) return false; }
+    }
+
+    // 出行
+    if (filterState.travel.size > 0 && !filterState.travel.has(r.travel)) return false;
+
+    // 房型
+    if (filterState.room.size > 0 && !filterState.room.has(r.fuzzy_room)) return false;
+
+    // 分类
+    if (filterState.cats.size > 0) {
+      const hasCat = r.cats.some(c => filterState.cats.has(c));
+      if (!hasCat) return false;
+    }
+
+    return true;
+  });
+
+  // 排序
+  filtered.sort((a, b) => {
+    switch (filterState.sort) {
+      case 'date_desc':    return (b.date > a.date ? 1 : -1);
+      case 'date_asc':     return (a.date > b.date ? 1 : -1);
+      case 'score_desc':   return b.score - a.score;
+      case 'score_asc':    return a.score - b.score;
+      case 'quality_desc': return b.quality - a.quality;
+      case 'useful_desc':  return b.useful - a.useful;
+      default: return 0;
+    }
+  });
+
+  renderCards();
+  renderPagination();
+  document.getElementById('resultCount').innerHTML =
+    `共找到 <strong>${filtered.length}</strong> 条评论`;
+}
+
+// ═══════════════════════════════════════════════
+//  渲染卡片
+// ═══════════════════════════════════════════════
+function scoreClass(s) {
+  if (s >= 5)   return 'score-5';
+  if (s >= 4)   return 'score-4';
+  if (s >= 3)   return 'score-3';
+  if (s >= 2)   return 'score-2';
+  return 'score-1';
+}
+
+function starStr(s) {
+  const full = Math.round(s);
+  return '★'.repeat(Math.min(full, 5)) + '☆'.repeat(Math.max(0, 5 - full));
+}
+
+function highlight(text, kw) {
+  if (!kw) return escHtml(text);
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return escHtml(text).replace(new RegExp(escaped, 'gi'), m => `<mark>${m}</mark>`);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+function renderCards() {
+  const grid = document.getElementById('cardsGrid');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filtered.slice(start, start + PAGE_SIZE);
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <p>未找到符合条件的评论，请尝试调整筛选条件</p>
+      </div>`;
+    return;
+  }
+
+  const kw = filterState.search.toLowerCase();
+
+  grid.innerHTML = page.map(r => {
+    // 图片缩略图
+    const imgHtml = r.images.length > 0 ? (() => {
+      const show  = r.images.slice(0, 4);
+      const extra = r.images.length - show.length;
+      const allIds = r.id; // 用 id 标识这组图片
+      const thumbs = show.map((url, i) =>
+        `<img class="thumb" src="${escHtml(url)}" alt="图片${i+1}"
+              data-id="${escHtml(r.id)}" data-idx="${i}" />`
+      ).join('');
+      const moreBtn = extra > 0
+        ? `<div class="more-imgs" data-id="${escHtml(r.id)}" data-idx="${show.length}">+${extra}</div>`
+        : '';
+      return `<div class="card-images">${thumbs}${moreBtn}</div>`;
+    })() : '';
+
+    // 分类标签
+    const catHtml = r.cats.length > 0
+      ? `<div class="card-cats">${r.cats.map(c => `<span class="cat-tag">${escHtml(c)}</span>`).join('')}</div>`
+      : '';
+
+    const commentHtml = highlight(r.comment, kw);
+    const isLong = r.comment.length > 200;
+
+    return `
+    <div class="review-card">
+      <div class="card-header">
+        <div class="card-meta">
+          <span class="card-date">📅 ${r.date}</span>
+          <div class="card-badges">
+            ${r.travel ? `<span class="badge badge-travel">${escHtml(r.travel)}</span>` : ''}
+            ${r.fuzzy_room ? `<span class="badge badge-room">${escHtml(r.fuzzy_room)}</span>` : ''}
+          </div>
+        </div>
+        <div class="score-wrap">
+          <div class="score-badge ${scoreClass(r.score)}">${r.score}</div>
+          <div class="score-stars">${starStr(r.score)}</div>
+        </div>
+      </div>
+
+      <div class="card-comment ${isLong ? 'collapsed' : ''}" id="cmt-${escHtml(r.id)}">${commentHtml}</div>
+      ${isLong ? `<button class="expand-btn" data-id="${escHtml(r.id)}">展开全文 ▾</button>` : ''}
+
+      ${catHtml}
+      ${imgHtml}
+
+      <div class="card-footer">
+        <span class="useful-tag">👍 ${r.useful} 人觉得有用</span>
+        <span>质量分 ${r.quality.toFixed(1)}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 展开/折叠
+  grid.querySelectorAll('.expand-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cmt = document.getElementById('cmt-' + btn.dataset.id);
+      if (cmt.classList.contains('collapsed')) {
+        cmt.classList.remove('collapsed');
+        btn.textContent = '收起 ▴';
+      } else {
+        cmt.classList.add('collapsed');
+        btn.textContent = '展开全文 ▾';
+      }
+    });
+  });
+
+  // 图片点击 → 灯箱
+  grid.querySelectorAll('.thumb, .more-imgs').forEach(el => {
+    el.addEventListener('click', () => {
+      const id  = el.dataset.id;
+      const idx = parseInt(el.dataset.idx);
+      const row = allData.find(r => r.id === id);
+      if (row) openLightbox(row.images, idx);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  分页
+// ═══════════════════════════════════════════════
+function renderPagination() {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  const el = document.getElementById('pagination');
+  if (total <= 1) { el.innerHTML = ''; return; }
+
+  const pages = [];
+  pages.push(`<button class="page-btn" id="prevBtn" ${currentPage === 1 ? 'disabled' : ''}>‹ 上一页</button>`);
+
+  const range = [];
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= currentPage - 2 && i <= currentPage + 2)) range.push(i);
+    else if (range[range.length - 1] !== '…') range.push('…');
+  }
+  range.forEach(p => {
+    if (p === '…') pages.push(`<span class="page-info">…</span>`);
+    else pages.push(`<button class="page-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`);
+  });
+
+  pages.push(`<button class="page-btn" id="nextBtn" ${currentPage === total ? 'disabled' : ''}>下一页 ›</button>`);
+
+  el.innerHTML = pages.join('');
+
+  el.querySelectorAll('.page-btn[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentPage = parseInt(btn.dataset.page);
+      renderCards();
+      renderPagination();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
+  const prev = el.querySelector('#prevBtn'), next = el.querySelector('#nextBtn');
+  if (prev) prev.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderCards(); renderPagination(); window.scrollTo({top:0,behavior:'smooth'}); } });
+  if (next) next.addEventListener('click', () => { if (currentPage < total) { currentPage++; renderCards(); renderPagination(); window.scrollTo({top:0,behavior:'smooth'}); } });
+}
+
+// ═══════════════════════════════════════════════
+//  灯箱
+// ═══════════════════════════════════════════════
+let lbImages = [], lbIdx = 0;
+
+function openLightbox(imgs, idx) {
+  lbImages = imgs;
+  lbIdx = idx;
+  updateLightbox();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function updateLightbox() {
+  // 使用大图（替换缩略图尺寸）
+  const url = lbImages[lbIdx].replace(/_R_\d+_\d+_R5_Q\d+_D/, '_R_800_525_R5_Q80_D');
+  document.getElementById('lbImg').src = url;
+  document.getElementById('lbCounter').textContent = `${lbIdx + 1} / ${lbImages.length}`;
+  document.getElementById('lbPrev').disabled = lbIdx === 0;
+  document.getElementById('lbNext').disabled = lbIdx === lbImages.length - 1;
+}
+
+document.getElementById('lbClose').addEventListener('click', closeLightbox);
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === document.getElementById('lightbox')) closeLightbox();
+});
+document.getElementById('lbPrev').addEventListener('click', () => { if (lbIdx > 0) { lbIdx--; updateLightbox(); } });
+document.getElementById('lbNext').addEventListener('click', () => { if (lbIdx < lbImages.length - 1) { lbIdx++; updateLightbox(); } });
+
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('lightbox').classList.contains('open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft'  && lbIdx > 0)                    { lbIdx--; updateLightbox(); }
+  if (e.key === 'ArrowRight' && lbIdx < lbImages.length - 1)  { lbIdx++; updateLightbox(); }
+});
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ═══════════════════════════════════════════════
+//  启动
+// ═══════════════════════════════════════════════
+loadData().catch(err => {
+  document.getElementById('cardsGrid').innerHTML =
+    `<div class="empty-state"><div class="empty-icon">⚠️</div><p>数据加载失败：${err.message}</p></div>`;
+});
+</script>
+</body>
+</html>
