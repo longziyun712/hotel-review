@@ -312,6 +312,17 @@
       border: 2px solid transparent;
     }
     .thumb:hover { opacity: .9; transform: scale(1.04); border-color: var(--gold); }
+    .thumb-error {
+      width: 68px; height: 68px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      border: 1.5px solid var(--border);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px; color: var(--muted); font-size: 10px;
+      text-align: center; line-height: 1.3;
+    }
+    .thumb-error .err-icon { font-size: 18px; }
     .more-imgs {
       width: 68px; height: 68px;
       border-radius: 8px;
@@ -826,7 +837,8 @@ function renderCards() {
       const allIds = r.id; // 用 id 标识这组图片
       const thumbs = show.map((url, i) =>
         `<img class="thumb" src="${escHtml(url)}" alt="图片${i+1}"
-              data-id="${escHtml(r.id)}" data-idx="${i}" />`
+              data-id="${escHtml(r.id)}" data-idx="${i}"
+              onerror="this.outerHTML='<div class=\\"thumb-error\\"><span class=\\"err-icon\\">🖼</span>图片加载失败</div>'" />`
       ).join('');
       const moreBtn = extra > 0
         ? `<div class="more-imgs" data-id="${escHtml(r.id)}" data-idx="${show.length}">+${extra}</div>`
